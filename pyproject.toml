@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zmk-battery"
+version = "0.1.0"
+description = "ZMK Split Keyboard Battery Monitor"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Claude" },
+]
+dependencies = [
+    "bleak>=0.21.1",
+    "pystray>=0.19.4",
+    "pillow>=10.0.0",
+    "winrt>=1.0.21033.1",
+    "pywin32>=306",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.3.0",
+    "isort>=5.12.0",
+    "mypy>=1.3.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
