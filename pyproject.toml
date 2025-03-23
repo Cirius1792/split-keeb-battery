@@ -1,7 +1,3 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
 name = "zmk-battery"
 version = "0.1.0"
@@ -16,8 +12,6 @@ dependencies = [
     "bleak>=0.21.1",
     "pystray>=0.19.4",
     "pillow>=10.0.0",
-    "winrt>=1.0.21033.1",
-    "pywin32>=306",
 ]
 
 [project.optional-dependencies]
@@ -41,3 +35,8 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.397",
+]

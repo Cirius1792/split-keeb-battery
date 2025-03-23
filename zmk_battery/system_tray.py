@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 import sys
 import tkinter as tk
 from dataclasses import dataclass
@@ -10,7 +9,12 @@ from enum import Enum
 from pathlib import Path
 from threading import Thread
 from tkinter import ttk
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Dict, Optional, TypeVar, Awaitable, cast, Any
+
+# Import pywin32 types for type hints
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from win32typing import PyHKEY
 
 import pystray
 from PIL import Image, ImageDraw
@@ -21,6 +25,8 @@ from win32con import (
     KEY_READ, 
     REG_SZ
 )
+
+T = TypeVar('T')
 
 from zmk_battery.battery_monitor import (
     BatteryMonitor,
@@ -85,7 +91,7 @@ class AsyncEventLoop:
             if self._thread:
                 self._thread.join(timeout=1.0)
                 
-    def run_coroutine(self, coro: asyncio.coroutine) -> asyncio.Future:
+    def run_coroutine(self, coro: Awaitable[T]) -> asyncio.Future[Any]:
         """Run a coroutine in the event loop.
         
         Args:
@@ -97,6 +103,7 @@ class AsyncEventLoop:
         if not self._loop:
             raise RuntimeError("Event loop not started")
         
+        # Safely wrap any awaitable in asyncio.run_coroutine_threadsafe
         return asyncio.run_coroutine_threadsafe(coro, self._loop)
 
 
@@ -217,7 +224,9 @@ class RegistryHelper:
             True if enabled, False otherwise
         """
         try:
-            key = RegOpenKeyEx(HKEY_CURRENT_USER, AUTORUN_REG_KEY, 0, KEY_READ)
+            # Cast HKEY_CURRENT_USER to Any to avoid type errors with PyHKEY
+            # Cast 0 to False for the reserved parameter
+            key = RegOpenKeyEx(cast(Any, HKEY_CURRENT_USER), AUTORUN_REG_KEY, cast(bool, 0), KEY_READ)
             try:
                 RegQueryValueEx(key, APP_NAME)
                 return True
@@ -242,7 +251,9 @@ class RegistryHelper:
             True if successful, False otherwise
         """
         try:
-            key = RegOpenKeyEx(HKEY_CURRENT_USER, AUTORUN_REG_KEY, 0, KEY_ALL_ACCESS)
+            # Cast HKEY_CURRENT_USER to Any to avoid type errors with PyHKEY
+            # Cast 0 to False for the reserved parameter
+            key = RegOpenKeyEx(cast(Any, HKEY_CURRENT_USER), AUTORUN_REG_KEY, cast(bool, 0), KEY_ALL_ACCESS)
             try:
                 if enabled:
                     exe_path = sys.executable
@@ -272,7 +283,9 @@ class RegistryHelper:
         """
         try:
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-            key = RegOpenKeyEx(HKEY_CURRENT_USER, key_path, 0, KEY_READ)
+            # Cast HKEY_CURRENT_USER to Any to avoid type errors with PyHKEY
+            # Cast 0 to False for the reserved parameter
+            key = RegOpenKeyEx(cast(Any, HKEY_CURRENT_USER), key_path, cast(bool, 0), KEY_READ)
             try:
                 value, _ = RegQueryValueEx(key, "SystemUsesLightTheme")
                 return bool(value)
@@ -438,11 +451,13 @@ class BatteryTrayApp:
         # Start device discovery
         def device_callback(device_name: str, device_id: str) -> None:
             if self._root and self._devices_list:
-                self._root.after(0, lambda: self._devices_list.insert("", "end", values=(device_name,), tags=(device_id,)))
+                devices_list = self._devices_list  # Local variable for type checker
+                self._root.after(0, lambda: devices_list.insert("", "end", values=(device_name,), tags=(device_id,)))
         
         def completion_callback() -> None:
             if self._root and self._reload_button:
-                self._root.after(0, lambda: self._reload_button.configure(text="Reload Devices", state=tk.NORMAL))
+                reload_button = self._reload_button  # Local variable for type checker
+                self._root.after(0, lambda: reload_button.configure(text="Reload Devices", state=tk.NORMAL))
         
         self._loop.run_coroutine(
             BatteryMonitor.list_paired_devices(device_callback, completion_callback)
@@ -487,16 +502,19 @@ class BatteryTrayApp:
                         if result.status == ConnectStatus.CONNECTED:
                             self._reconnect_timer_running = False
                             if self._status_label:
-                                self._status_label.configure(text=f"Connected to {self._device_name}")
+                                status_label = self._status_label  # Local variable for type checker
+                                status_label.configure(text=f"Connected to {self._device_name}")
                             if self._connect_button:
-                                self._connect_button.configure(text="Disconnect")
+                                connect_button = self._connect_button  # Local variable for type checker
+                                connect_button.configure(text="Disconnect")
                             self._update_tray_icon()
                         else:
                             # Failed to connect, retry
                             self._reconnect_counter = RECONNECT_INTERVAL
                             if self._status_label:
+                                status_label = self._status_label  # Local variable for type checker
                                 error_msg = result.error_message or result.status.name
-                                self._status_label.configure(
+                                status_label.configure(
                                     text=f"Could not connect to '{self._device_name}': {error_msg}"
                                 )
                             # Schedule next attempt
@@ -577,8 +595,10 @@ class BatteryTrayApp:
                     if result.status == ConnectStatus.CONNECTED:
                         self._device_name = device_name
                         self._device_id = device_id
-                        self._status_label.configure(text=f"Connected to {device_name}")
-                        self._connect_button.configure(text="Disconnect", state=tk.NORMAL)
+                        status_label = self._status_label  # Local variable for type checker
+                        connect_button = self._connect_button  # Local variable for type checker
+                        status_label.configure(text=f"Connected to {device_name}")
+                        connect_button.configure(text="Disconnect", state=tk.NORMAL)
                         self._update_tray_icon()
                         
                         # Update auto-run if enabled
@@ -586,14 +606,18 @@ class BatteryTrayApp:
                             RegistryHelper.set_auto_run_enabled(True, device_name, device_id)
                     else:
                         error_msg = result.error_message or result.status.name
-                        self._status_label.configure(
+                        status_label = self._status_label  # Local variable for type checker
+                        connect_button = self._connect_button  # Local variable for type checker
+                        status_label.configure(
                             text=f"Could not connect to '{device_name}': {error_msg}"
                         )
-                        self._connect_button.configure(text="Connect", state=tk.NORMAL)
+                        connect_button.configure(text="Connect", state=tk.NORMAL)
                 except Exception as e:
                     logger.error(f"Connection error: {e}")
-                    self._status_label.configure(text=f"Connection error: {e}")
-                    self._connect_button.configure(text="Connect", state=tk.NORMAL)
+                    status_label = self._status_label  # Local variable for type checker
+                    connect_button = self._connect_button  # Local variable for type checker
+                    status_label.configure(text=f"Connection error: {e}")
+                    connect_button.configure(text="Connect", state=tk.NORMAL)
             
             future.add_done_callback(on_connect_done)
     
